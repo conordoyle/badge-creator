@@ -1,0 +1,6 @@
+Flask
+requests
+Pillow
+fpdf2
+python-dotenv
+gunicorn

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ID Badge Creator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>ID Badge Creator</h1>
+            <p>Upload your photo and details to generate a custom event badge.</p>
+        </div>
+        <form action="/create_badge" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="category">Category</label>
+                <select id="category" name="category" required>
+                    <option value="AX7">AX7</option>
+                    <option value="Deftones">Deftones</option>
+                    <option value="Korn">Korn</option>
+                    <option value="LNT">LNT</option>
+                    <option value="System of a Down Crew">System of a Down Crew</option>
+                    <option value="Polyphia">Polyphia</option>
+                    <option value="Wisp">Wisp</option>
+                    <option value="Locals">Locals</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="photo">Your Photo</label>
+                <input type="file" id="photo" name="photo" accept="image/*" required>
+            </div>
+            
+            <button type="submit" class="submit-btn">Process Photo</button>
+        </form>
+
+        <div id="preview" class="preview-container" style="display:none;">
+            <h2>Badge Preview</h2>
+            <canvas id="badgeCanvas" width="600" height="900"></canvas>
+            <div class="form-group">
+                <label for="fontSize">Font Size: <span id="fontSizeValue">75</span>px</label>
+                <input type="range" id="fontSize" name="fontSize" min="40" max="120" value="75" class="slider">
+            </div>
+            <button id="downloadBtn">Download JPG</button>
+        </div>
+    </div>
+
+    <script>
+        const form = document.querySelector('form');
+        const previewContainer = document.getElementById('preview');
+        const canvas = document.getElementById('badgeCanvas');
+        const ctx = canvas.getContext('2d');
+        const downloadButton = document.getElementById('downloadBtn');
+        
+        const nameInput = document.getElementById('name');
+        const categoryInput = document.getElementById('category');
+        const fontSizeSlider = document.getElementById('fontSize');
+        const fontSizeValue = document.getElementById('fontSizeValue');
+        
+        let userImage = new Image();
+        let currentBackgroundColor = 'white';
+        let processedImageFilename = ''; // To store the filename for the final download
+
+        function drawBadge() {
+            if (!userImage.src) return;
+
+            const name = nameInput.value;
+            const category = categoryInput.value;
+            const fontSize = fontSizeSlider.value;
+            
+            // These colors need to match your Python dictionary
+            const categoryColors = {
+                "AX7": "Yellow", "Deftones": "Yellow", "Korn": "Yellow",
+                "LNT": "White", "System of a Down Crew": "black",
+                "Polyphia": "white", "Wisp": "white", "Locals": "lightblue"
+            };
+            currentBackgroundColor = categoryColors[category] || 'white';
+
+            // 1. Draw background
+            ctx.fillStyle = currentBackgroundColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 2. Draw user image
+            const targetWidth = 700;
+            const targetHeight = 700;
+            const aspectRatio = userImage.width / userImage.height;
+            let drawWidth = targetWidth;
+            let drawHeight = targetHeight;
+
+            if (userImage.width > userImage.height) {
+                drawHeight = targetWidth / aspectRatio;
+            } else {
+                drawWidth = targetHeight * aspectRatio;
+            }
+
+            const imgX = (canvas.width - drawWidth) / 2;
+            const imgY = canvas.height - drawHeight - 200;
+            ctx.drawImage(userImage, imgX, imgY, drawWidth, drawHeight);
+
+            // 3. Draw text
+            ctx.font = `${fontSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = (currentBackgroundColor === 'black') ? 'white' : 'black';
+            
+            const textX = canvas.width / 2;
+            const textY = canvas.height - 40;
+            ctx.fillText(name, textX, textY);
+        }
+
+        // --- Event Listeners ---
+
+        nameInput.addEventListener('input', drawBadge);
+        categoryInput.addEventListener('input', drawBadge);
+        fontSizeSlider.addEventListener('input', function() {
+            fontSizeValue.textContent = this.value;
+            drawBadge();
+        });
+
+        userImage.onload = function() {
+            drawBadge();
+        };
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitButton = form.querySelector('.submit-btn');
+            submitButton.textContent = 'Processing...';
+            submitButton.disabled = true;
+
+            const formData = new FormData(form);
+            const response = await fetch('/create_badge', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                userImage.src = data.processed_image_url;
+                processedImageFilename = data.processed_filename; // Save the filename
+                previewContainer.style.display = 'block';
+            } else {
+                alert('Error creating badge. Please try again.');
+            }
+
+            submitButton.textContent = 'Process Photo';
+            submitButton.disabled = false;
+        });
+
+        downloadButton.addEventListener('click', async () => {
+            if (!processedImageFilename) return;
+
+            downloadButton.textContent = 'Generating...';
+            downloadButton.disabled = true;
+
+            const response = await fetch('/generate_final_badge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    processed_filename: processedImageFilename,
+                    name: nameInput.value,
+                    category: categoryInput.value,
+                    font_size: fontSizeSlider.value
+                })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `badge_${nameInput.value.replace(/ /g, '_')}.jpg`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } else {
+                alert('Error generating final badge.');
+            }
+
+            downloadButton.textContent = 'Download JPG';
+            downloadButton.disabled = false;
+        });
+    </script>
+</body>
+</html>
