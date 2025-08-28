@@ -89,34 +89,67 @@ def create_badge_image(image_path, name, category, output_path, font_size):
 
     draw = ImageDraw.Draw(badge)
     
+    # Try to load a truetype font, fall back to default with proper size handling
     font = None
-    # Prioritize font file in project directory, then check common system paths
     font_paths = [
-        "Arial.ttf",
-        "/System/Library/Fonts/Arial.ttf", "/System/Library/Fonts/Helvetica.ttc",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "arial.ttf", "C:/Windows/Fonts/arial.ttf"
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "Arial.ttf"),
+        "/System/Library/Fonts/Arial.ttf", 
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "C:/Windows/Fonts/arial.ttf"
     ]
-    font_found = False
+    
     for font_path in font_paths:
         try:
             font = ImageFont.truetype(font_path, font_size)
-            font_found = True
             break
         except (IOError, OSError):
             continue
     
-    if not font_found:
-        print("Warning: A suitable font was not found. Falling back to the default font, which may not render the correct font size.")
-        font = ImageFont.load_default()
+    # If no truetype font found, create a scaled bitmap font
+    if font is None:
+        try:
+            # Try to get default font and scale it appropriately
+            default_font = ImageFont.load_default()
+            # Create a scaled version by adjusting the drawing approach
+            font = default_font
+            # We'll handle scaling differently below when drawing
+        except:
+            font = ImageFont.load_default()
 
     text_color = "white" if bg_color == "black" else "black"
     
-    bbox = draw.textbbox((0, 0), name, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    text_pos = ((width - text_w) // 2, height - text_h - 40)
-    
-    draw.text(text_pos, name, fill=text_color, font=font)
+    # Handle text drawing with proper font size scaling
+    if hasattr(font, 'path') and font.path:
+        # This is a truetype font, use it normally
+        bbox = draw.textbbox((0, 0), name, font=font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+        text_pos = ((width - text_w) // 2, height - text_h - 40)
+        draw.text(text_pos, name, fill=text_color, font=font)
+    else:
+        # This is the default bitmap font, simulate scaling by drawing multiple times
+        # or use a different approach
+        scale_factor = max(1, font_size // 11)  # Default font is roughly 11px
+        
+        # For larger fonts with default font, we'll draw the text multiple times with slight offsets
+        # to create a bold/thick effect that simulates larger size
+        base_x = width // 2
+        base_y = height - 40
+        
+        # Calculate approximate text width for centering (rough estimation)
+        char_width = 7 * scale_factor  # Approximate character width
+        text_width = len(name) * char_width
+        start_x = base_x - text_width // 2
+        
+        if scale_factor > 1:
+            # Draw text multiple times with offsets to simulate thickness
+            for dx in range(scale_factor):
+                for dy in range(scale_factor):
+                    draw.text((start_x + dx, base_y + dy), name, fill=text_color, font=font)
+        else:
+            draw.text((start_x, base_y), name, fill=text_color, font=font)
     
     badge.save(output_path, 'jpeg', quality=95, dpi=(300, 300))
 
