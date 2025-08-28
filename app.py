@@ -44,7 +44,6 @@ def create_badge():
 
     name = request.form['name']
     category = request.form['category']
-    fontSize = int(request.form.get('fontSize', 75))  # Default to 75 if not provided
 
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
@@ -91,18 +90,23 @@ def create_badge_image(image_path, name, category, output_path, font_size):
     draw = ImageDraw.Draw(badge)
     
     font = None
+    # Prioritize font file in project directory, then check common system paths
     font_paths = [
+        "Arial.ttf",
         "/System/Library/Fonts/Arial.ttf", "/System/Library/Fonts/Helvetica.ttc",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "arial.ttf", "C:/Windows/Fonts/arial.ttf"
     ]
+    font_found = False
     for font_path in font_paths:
         try:
             font = ImageFont.truetype(font_path, font_size)
+            font_found = True
             break
         except (IOError, OSError):
             continue
     
-    if font is None:
+    if not font_found:
+        print("Warning: A suitable font was not found. Falling back to the default font, which may not render the correct font size.")
         font = ImageFont.load_default()
 
     text_color = "white" if bg_color == "black" else "black"

@@ -109,6 +109,7 @@
             // 3. Draw text
             ctx.font = `${fontSize}px Arial`;
             ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom'; // Align text position with backend
             ctx.fillStyle = (currentBackgroundColor === 'black') ? 'white' : 'black';
             
             const textX = canvas.width / 2;
