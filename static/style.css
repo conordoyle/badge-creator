@@ -74,6 +74,25 @@ input[type="file"] {
     padding: 10px;
 }
 
+#drop-zone {
+    border: 2px dashed var(--input-border);
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.3s ease, background-color 0.3s ease;
+}
+
+#drop-zone p {
+    margin: 0;
+    color: #666;
+}
+
+#drop-zone.drag-over {
+    background-color: #f0eeff;
+    border-color: var(--primary-color);
+}
+
 .slider {
     -webkit-appearance: none;
     appearance: none;

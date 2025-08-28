@@ -35,9 +35,9 @@
                 </select>
             </div>
             
-            <div class="form-group">
-                <label for="photo">Your Photo</label>
-                <input type="file" id="photo" name="photo" accept="image/*" required>
+            <div class="form-group" id="drop-zone">
+                <p>Drag & drop your photo here, or click to select a file.</p>
+                <input type="file" id="photo" name="photo" accept="image/*" required hidden>
             </div>
             
             <button type="submit" class="submit-btn">Process Photo</button>
@@ -65,6 +65,8 @@
         const categoryInput = document.getElementById('category');
         const fontSizeSlider = document.getElementById('fontSize');
         const fontSizeValue = document.getElementById('fontSizeValue');
+        const photoInput = document.getElementById('photo');
+        const dropZone = document.getElementById('drop-zone');
         
         let userImage = new Image();
         let currentBackgroundColor = 'white';
@@ -126,6 +128,39 @@
             drawBadge();
         });
 
+        // --- Drag and Drop Event Listeners ---
+        
+        dropZone.addEventListener('click', () => photoInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                photoInput.files = files;
+                const changeEvent = new Event('change');
+                photoInput.dispatchEvent(changeEvent);
+            }
+        });
+
+        photoInput.addEventListener('change', () => {
+            if (photoInput.files.length > 0) {
+                const fileName = photoInput.files[0].name;
+                dropZone.querySelector('p').textContent = `Selected file: ${fileName}`;
+            }
+        });
+        
         userImage.onload = function() {
             drawBadge();
         };
