@@ -71,13 +71,15 @@ def create_badge_image(image_path, name, category, output_path, font_size):
     # Badge dimensions (2x3 inches at 300 dpi)
     width, height = 600, 900
     bg_color = CATEGORY_COLORS.get(category, "white")
+
+    app.logger.info(f"[create_badge_image] Start: name='{name}', category='{category}', font_size={font_size}")
     
     badge = Image.new('RGB', (width, height), color=bg_color)
     
     try:
         user_photo = Image.open(image_path)
     except IOError:
-        print("Cannot open user photo")
+        app.logger.error("[create_badge_image] Cannot open user photo at %s", image_path)
         return
 
     # Resize photo to fit nicely
@@ -92,6 +94,7 @@ def create_badge_image(image_path, name, category, output_path, font_size):
     # Try to load a truetype font, fall back to default with proper size handling
     font = None
     font_paths = [
+        "DejaVuSans.ttf",  # Pillow-bundled font, usually available
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "Arial.ttf"),
         "/System/Library/Fonts/Arial.ttf", 
         "/System/Library/Fonts/Helvetica.ttc",
@@ -99,59 +102,78 @@ def create_badge_image(image_path, name, category, output_path, font_size):
         "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
         "C:/Windows/Fonts/arial.ttf"
     ]
+
+    app.logger.info(f"[create_badge_image] Trying font paths in order: {font_paths}")
     
+    chosen_font_path = None
     for font_path in font_paths:
         try:
             font = ImageFont.truetype(font_path, font_size)
+            chosen_font_path = font_path
+            app.logger.info(f"[create_badge_image] Using font: {font_path}")
             break
-        except (IOError, OSError):
+        except (IOError, OSError) as e:
+            app.logger.warning(f"[create_badge_image] Failed to load font '{font_path}': {e}")
             continue
     
     # If no truetype font found, create a scaled bitmap font
     if font is None:
+        app.logger.warning("[create_badge_image] No truetype font found; falling back to bitmap default font.")
         try:
-            # Try to get default font and scale it appropriately
             default_font = ImageFont.load_default()
-            # Create a scaled version by adjusting the drawing approach
             font = default_font
-            # We'll handle scaling differently below when drawing
-        except:
+        except Exception as e:
+            app.logger.error(f"[create_badge_image] load_default failed: {e}")
             font = ImageFont.load_default()
 
     text_color = "white" if bg_color == "black" else "black"
     
     # Handle text drawing with proper font size scaling
-    if hasattr(font, 'path') and font.path:
+    try:
+        is_ttf = isinstance(font, ImageFont.FreeTypeFont)
+    except Exception:
+        is_ttf = False
+
+    if is_ttf:
         # This is a truetype font, use it normally
         bbox = draw.textbbox((0, 0), name, font=font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
         text_pos = ((width - text_w) // 2, height - text_h - 40)
+        app.logger.info(f"[create_badge_image] TTF font bbox={bbox}, text_w={text_w}, text_h={text_h}")
         draw.text(text_pos, name, fill=text_color, font=font)
     else:
-        # This is the default bitmap font, simulate scaling by drawing multiple times
-        # or use a different approach
-        scale_factor = max(1, font_size // 11)  # Default font is roughly 11px
-        
-        # For larger fonts with default font, we'll draw the text multiple times with slight offsets
-        # to create a bold/thick effect that simulates larger size
-        base_x = width // 2
-        base_y = height - 40
-        
-        # Calculate approximate text width for centering (rough estimation)
-        char_width = 7 * scale_factor  # Approximate character width
-        text_width = len(name) * char_width
-        start_x = base_x - text_width // 2
-        
-        if scale_factor > 1:
-            # Draw text multiple times with offsets to simulate thickness
-            for dx in range(scale_factor):
-                for dy in range(scale_factor):
-                    draw.text((start_x + dx, base_y + dy), name, fill=text_color, font=font)
-        else:
-            draw.text((start_x, base_y), name, fill=text_color, font=font)
-    
+        # Fallback: Render with bitmap font, then scale to requested size
+        app.logger.info("[create_badge_image] Using bitmap fallback with mask scaling.")
+        default_font = font
+        # First render at native bitmap size to measure
+        temp_img = Image.new('L', (width, height), 0)
+        temp_draw = ImageDraw.Draw(temp_img)
+        bbox = temp_draw.textbbox((0, 0), name, font=default_font)
+        native_w = bbox[2] - bbox[0]
+        native_h = bbox[3] - bbox[1]
+        if native_w <= 0 or native_h <= 0:
+            native_w, native_h = 1, 1
+        # Create a tight mask at native size
+        mask_img = Image.new('L', (native_w, native_h), 0)
+        mask_draw = ImageDraw.Draw(mask_img)
+        mask_draw.text((0, 0), name, fill=255, font=default_font)
+        # Compute scale to target font_size height
+        scale = max(1.0, float(font_size) / float(native_h))
+        scaled_w = max(1, int(round(native_w * scale)))
+        scaled_h = max(1, int(round(native_h * scale)))
+        scaled_mask = mask_img.resize((scaled_w, scaled_h), resample=Image.NEAREST)
+        # Center horizontally; position 40px from bottom like TTF path
+        pos_x = (width - scaled_w) // 2
+        pos_y = height - scaled_h - 40
+        # Build a colored text image and composite via mask
+        color_rgb = (255, 255, 255) if text_color == 'white' else (0, 0, 0)
+        text_img = Image.new('RGB', (scaled_w, scaled_h), color_rgb)
+        badge.paste(text_img, (pos_x, pos_y), scaled_mask)
+        app.logger.info(f"[create_badge_image] Bitmap fallback bbox_native=({native_w}x{native_h}) -> scaled=({scaled_w}x{scaled_h}) at ({pos_x},{pos_y})")
+
     badge.save(output_path, 'jpeg', quality=95, dpi=(300, 300))
+    app.logger.info(f"[create_badge_image] Saved badge to {output_path}. Chosen font: {chosen_font_path or 'bitmap_default'}")
 
 @app.route('/generate_final_badge', methods=['POST'])
 def generate_final_badge():
