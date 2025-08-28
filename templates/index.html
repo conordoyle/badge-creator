@@ -47,8 +47,8 @@
             <h2>Badge Preview</h2>
             <canvas id="badgeCanvas" width="600" height="900"></canvas>
             <div class="form-group">
-                <label for="fontSize">Font Size: <span id="fontSizeValue">75</span>px</label>
-                <input type="range" id="fontSize" name="fontSize" min="40" max="120" value="75" class="slider">
+                <label for="fontSize">Font Size: <span id="fontSizeValue">48</span>px</label>
+                <input type="range" id="fontSize" name="fontSize" min="24" max="72" value="48" class="slider">
             </div>
             <button id="downloadBtn">Download JPG</button>
         </div>
@@ -77,7 +77,7 @@
 
             const name = nameInput.value;
             const category = categoryInput.value;
-            const fontSize = fontSizeSlider.value;
+            const fontSize = parseInt(fontSizeSlider.value);
             
             // These colors need to match your Python dictionary
             const categoryColors = {
@@ -87,35 +87,49 @@
             };
             currentBackgroundColor = categoryColors[category] || 'white';
 
-            // 1. Draw background
+            // Clear and draw background
             ctx.fillStyle = currentBackgroundColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 2. Draw user image
-            const targetWidth = 700;
-            const targetHeight = 700;
-            const aspectRatio = userImage.width / userImage.height;
-            let drawWidth = targetWidth;
-            let drawHeight = targetHeight;
-
-            if (userImage.width > userImage.height) {
-                drawHeight = targetWidth / aspectRatio;
-            } else {
-                drawWidth = targetHeight * aspectRatio;
+            // Calculate image dimensions to match backend logic
+            const maxPhotoSize = 500; // Match backend max_photo_size
+            let drawWidth = userImage.width;
+            let drawHeight = userImage.height;
+            
+            // Scale down if larger than max size (preserve aspect ratio)
+            if (drawWidth > maxPhotoSize || drawHeight > maxPhotoSize) {
+                const scale = Math.min(maxPhotoSize / drawWidth, maxPhotoSize / drawHeight);
+                drawWidth = drawWidth * scale;
+                drawHeight = drawHeight * scale;
             }
 
+            // Position image to match backend (centered horizontally, 80px from top)
             const imgX = (canvas.width - drawWidth) / 2;
-            const imgY = canvas.height - drawHeight - 200;
+            const imgY = 80; // Match backend img_y = 80
             ctx.drawImage(userImage, imgX, imgY, drawWidth, drawHeight);
 
-            // 3. Draw text
-            ctx.font = `${fontSize}px Arial`;
+            // Setup text drawing to match backend
+            ctx.font = `bold ${fontSize}px Arial, sans-serif`; // Use bold to match DejaVu Sans Bold
             ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom'; // Align text position with backend
-            ctx.fillStyle = (currentBackgroundColor === 'black') ? 'white' : 'black';
+            ctx.textBaseline = 'top'; // Change to top for consistent positioning
             
+            // Text color logic to match backend
+            const textColor = (currentBackgroundColor.toLowerCase() === 'black') ? 'white' : 'black';
+            const outlineColor = textColor === 'white' ? 'black' : 'white';
+            
+            // Calculate text position to match backend (center horizontally, 60px from bottom)
             const textX = canvas.width / 2;
-            const textY = canvas.height - 40;
+            const textMetrics = ctx.measureText(name);
+            const textHeight = fontSize; // Approximate text height
+            const textY = canvas.height - textHeight - 60; // Match backend positioning
+            
+            // Draw text outline for better readability (match backend)
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = outlineColor;
+            ctx.strokeText(name, textX, textY);
+            
+            // Draw main text
+            ctx.fillStyle = textColor;
             ctx.fillText(name, textX, textY);
         }
 
