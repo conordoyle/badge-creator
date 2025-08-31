@@ -92,7 +92,7 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // Calculate image dimensions to match backend logic
-            const maxPhotoSize = 500; // Match backend max_photo_size
+            const maxPhotoSize = 750; // Match backend max_photo_size
             let drawWidth = userImage.width;
             let drawHeight = userImage.height;
             
@@ -103,9 +103,9 @@
                 drawHeight = drawHeight * scale;
             }
 
-            // Position image to match backend (centered horizontally, 80px from top)
+            // Position image to match backend (centered horizontally, 50px from top)
             const imgX = (canvas.width - drawWidth) / 2;
-            const imgY = 80; // Match backend img_y = 80
+            const imgY = 0; // Match backend img_y = 50
             ctx.drawImage(userImage, imgX, imgY, drawWidth, drawHeight);
 
             // Setup text drawing to match backend

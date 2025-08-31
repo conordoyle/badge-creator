@@ -127,13 +127,13 @@ def create_badge_image(image_path, name, category, output_path, font_size):
         return
 
     # Resize photo to fit nicely (preserve aspect ratio)
-    max_photo_size = 500  # Larger photo for better visibility
+    max_photo_size = 750  # Larger photo for better visibility
     user_photo.thumbnail((max_photo_size, max_photo_size), Image.Resampling.LANCZOS)
     
     # Center the photo horizontally and position it in the upper portion
     img_w, img_h = user_photo.size
     img_x = (width - img_w) // 2
-    img_y = 80  # Fixed position from top
+    img_y = 0  # Fixed position from top
     
     # Paste the photo (handle transparency)
     if user_photo.mode == 'RGBA':
